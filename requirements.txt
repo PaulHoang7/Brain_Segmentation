@@ -1,0 +1,17 @@
+# BraTS-SAM-LoRA — core dependencies
+numpy>=1.24
+nibabel>=5.0
+torch>=2.0
+torchvision>=0.15
+scipy>=1.10
+scikit-learn>=1.2
+matplotlib>=3.7
+tqdm>=4.60
+pyyaml>=6.0
+
+# SAM (install from git or local)
+# pip install git+https://github.com/facebookresearch/segment-anything.git
+
+# Optional: logging
+# tensorboard>=2.12
+# wandb>=0.15

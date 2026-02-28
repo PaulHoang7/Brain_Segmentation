@@ -1,0 +1,10 @@
+# ── BraTS-SAM-LoRA: path configuration ──────────────────────────
+# Override per-machine by setting env vars DATASET_ROOT / OUTPUT_ROOT.
+# yaml takes priority over env.
+
+dataset_root: /mnt/nfs-data/tin_dataset/asnr-miccai-brats2023-gli-challenge-trainingdata
+output_root:  /mnt/nfs-data/tin_dataset/datn_outputs
+
+# Subdirectory inside dataset_root that contains BraTS-GLI-* patient folders.
+# Set to "" if patients are directly under dataset_root.
+dataset_subdir: ASNR-MICCAI-BraTS2023-GLI-Challenge-TrainingData

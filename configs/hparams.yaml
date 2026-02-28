@@ -1,0 +1,69 @@
+# ── BraTS-SAM-LoRA: hyperparameters ─────────────────────────────
+# Single source of truth for all training / eval scripts.
+
+seed: 42
+
+# ── Data ────────────────────────────────────────────────────────
+data:
+  modalities: [t2f, t1c, t2w]           # SAM 3-ch input order
+  all_modalities: [t1n, t1c, t2w, t2f]
+  bbox_pad: 5                            # tight bbox padding (px)
+  split_ratios: [0.70, 0.15, 0.15]      # train / val / test
+
+# ── Prompt Generator (PG) ──────────────────────────────────────
+pg:
+  backbone: resnet18
+  input_channels: 9                      # 3 mods × 3 slices
+  img_size: 224
+  epochs: 50
+  batch_size: 64
+  lr: 1.0e-3
+  weight_decay: 0.01
+  focal_gamma: 2.0
+  temporal_weight: 0.5
+  pos_sample_weight: 3.0
+  scheduler: cosine
+  warmup_ratio: 0.1
+  smoothing_alpha: 0.8                   # EMA along z at inference
+
+# ── SAM ViT-B ──────────────────────────────────────────────────
+sam:
+  model: vit_b
+  checkpoint: sam_vit_b_01ec64.pth       # filename inside ckpt/
+  img_size: 1024
+  pixel_mean: [123.675, 116.28, 103.53]  # ImageNet (SAM default)
+  pixel_std:  [58.395, 57.12, 57.375]
+
+# ── LoRA ────────────────────────────────────────────────────────
+lora:
+  rank: 16
+  alpha: 32
+  dropout: 0.05
+  targets:                               # where to inject
+    - encoder_attn_qkv
+    - encoder_attn_proj
+    - mask_decoder
+
+# ── SAM+LoRA Training ──────────────────────────────────────────
+sam_train:
+  epochs: 30
+  batch_size: 4
+  lr: 1.0e-4
+  weight_decay: 0.01
+  scheduler: cosine
+  warmup_ratio: 0.1
+  bbox_jitter_shift: 0.1
+  bbox_jitter_scale: 0.1
+  loss: dice_bce                         # dice_bce | dice_focal
+
+# ── Cascade Inference ──────────────────────────────────────────
+cascade:
+  targets: [WT, TC, ET]
+  hierarchy_enforce: true
+  postprocess_min_cc: 50                 # remove CC < N voxels
+  pg_smoothing_alpha: 0.8               # EMA along z
+
+# ── Evaluation ──────────────────────────────────────────────────
+eval:
+  metrics: [dice, hd95]
+  targets: [WT, TC, ET]

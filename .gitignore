@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Environments
+.env
+.venv/
+env/
+venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data / outputs — never commit large files
+*.npy
+*.nii
+*.nii.gz
+*.h5
+*.hdf5
+*.pt
+*.pth
+*.ckpt
+
+# Project outputs
+/mnt/

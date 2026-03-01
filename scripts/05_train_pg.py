@@ -10,6 +10,7 @@ Sched:   Cosine annealing with linear warmup
 Usage:
     python scripts/05_train_pg.py                          # from hparams.yaml
     python scripts/05_train_pg.py --epochs 2 --batch_size 16  # override
+    python scripts/05_train_pg.py --resume --epochs 20     # resume from last.pth, train to epoch 20
 
 Output:
     {OUTPUT_ROOT}/ckpt/pg/best.pth
@@ -20,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import os
 import sys
 import time
 from collections import defaultdict
@@ -232,7 +234,7 @@ def validate(model, loader, device, hp, max_batches: int = 0):
 
 # ── Main ─────────────────────────────────────────────────────────
 def main(epochs: int = None, batch_size: int = None, lr: float = None,
-         num_workers: int = 0, max_batches: int = 0):
+         num_workers: int = 0, max_batches: int = 0, resume: bool = False):
     t0 = time.time()
     ensure_dirs()
     hp = load_hparams().get("pg", {})
@@ -292,7 +294,49 @@ def main(epochs: int = None, batch_size: int = None, lr: float = None,
     total_steps = epochs * len(train_loader)
     warmup_steps = int(warmup_ratio * total_steps)
     scheduler = build_scheduler(optimizer, total_steps, warmup_steps)
+
+    # ── Resume from checkpoint ────────────────────────────────
+    start_epoch = 1
+    best_val_loss = float("inf")
+    best_epoch = -1
+
+    if resume:
+        last_ckpt = ckpt_dir / "last.pth"
+        if not last_ckpt.exists():
+            print(f"[PG Train] WARNING: --resume but {last_ckpt} not found, training from scratch")
+        else:
+            ckpt_state = torch.load(last_ckpt, map_location=device, weights_only=False)
+            model.load_state_dict(ckpt_state["model_state_dict"])
+            optimizer.load_state_dict(ckpt_state["optimizer_state_dict"])
+            start_epoch = ckpt_state["epoch"] + 1
+            best_val_loss = ckpt_state.get("val_loss", float("inf"))
+            best_epoch = ckpt_state.get("epoch", -1)
+
+            # Restore scheduler state
+            if "scheduler_state_dict" in ckpt_state:
+                scheduler.load_state_dict(ckpt_state["scheduler_state_dict"])
+            else:
+                # Fallback: advance scheduler step-by-step
+                resumed_steps = ckpt_state["epoch"] * len(train_loader)
+                for _ in range(resumed_steps):
+                    scheduler.step()
+
+            # Also restore best from best.pth if it exists
+            best_ckpt = ckpt_dir / "best.pth"
+            if best_ckpt.exists():
+                best_state = torch.load(best_ckpt, map_location="cpu", weights_only=False)
+                best_val_loss = best_state.get("val_loss", best_val_loss)
+                best_epoch = best_state.get("epoch", best_epoch)
+
+            print(f"[PG Train] Resumed from epoch {ckpt_state['epoch']}  "
+                  f"(best_epoch={best_epoch} best_val_loss={best_val_loss:.4f})")
+
+    if start_epoch > epochs:
+        print(f"[PG Train] Already trained {start_epoch - 1} epochs, --epochs={epochs}. Nothing to do.")
+        return
+
     print(f"[PG Train] total_steps={total_steps}  warmup_steps={warmup_steps}")
+    print(f"[PG Train] Training epochs {start_epoch}→{epochs}")
     print()
 
     # ── CSV log ──────────────────────────────────────────────────
@@ -301,15 +345,15 @@ def main(epochs: int = None, batch_size: int = None, lr: float = None,
         "epoch", "train_loss", "train_obj", "train_reg", "train_giou", "train_temp",
         "val_loss", "val_prec", "val_rec", "val_f1", "val_iou", "lr",
     ]
-    csv_file = open(csv_path, "w", newline="")
+    # Append if resuming and CSV exists, otherwise overwrite
+    csv_mode = "a" if (resume and csv_path.exists()) else "w"
+    csv_file = open(csv_path, csv_mode, newline="")
     csv_writer = csv.DictWriter(csv_file, fieldnames=csv_fields)
-    csv_writer.writeheader()
+    if csv_mode == "w":
+        csv_writer.writeheader()
 
     # ── Training loop ────────────────────────────────────────────
-    best_val_loss = float("inf")
-    best_epoch = -1
-
-    for epoch in range(1, epochs + 1):
+    for epoch in range(start_epoch, epochs + 1):
         ep_t0 = time.time()
 
         train_metrics = train_epoch(model, train_loader, optimizer, scheduler,
@@ -356,6 +400,7 @@ def main(epochs: int = None, batch_size: int = None, lr: float = None,
             "epoch": epoch,
             "model_state_dict": model.state_dict(),
             "optimizer_state_dict": optimizer.state_dict(),
+            "scheduler_state_dict": scheduler.state_dict(),
             "val_loss": val_metrics["loss"],
             "val_f1": val_metrics["f1"],
             "val_iou": val_metrics["bbox_iou"],
@@ -387,4 +432,6 @@ if __name__ == "__main__":
                    help="DataLoader workers (0=main process, best for NFS)")
     p.add_argument("--max_batches", type=int, default=0,
                    help="Stop each epoch after N batches (0=full epoch)")
+    p.add_argument("--resume", action="store_true",
+                   help="Resume training from last.pth checkpoint")
     main(**vars(p.parse_args()))

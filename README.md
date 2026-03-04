@@ -61,6 +61,25 @@ python scripts/09_eval_full.py            # Dice/HD95 on test set
 python scripts/10_export_results.py       # final tables + figures
 ```
 
+## GitHub Tracking (Progress + Bugs)
+
+This repo includes GitHub templates and a setup script for consistent tracking:
+
+- Issue templates:
+  - `.github/ISSUE_TEMPLATE/bug_report.yml`
+  - `.github/ISSUE_TEMPLATE/progress_update.yml`
+- PR template:
+  - `.github/PULL_REQUEST_TEMPLATE.md`
+- Workflow guide:
+  - `docs/GITHUB_TRACKING.md`
+
+Optional one-time setup for labels and milestones (requires GitHub CLI):
+
+```bash
+gh auth login
+pwsh ./scripts/11_setup_github_tracking.ps1 -Repo "PaulHoang7/Brain_Segmentation"
+```
+
 ## Project Structure
 
 ```

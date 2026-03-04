@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Tracking guide
+    url: https://github.com/PaulHoang7/Brain_Segmentation/blob/main/docs/GITHUB_TRACKING.md
+    about: See the progress and bug tracking workflow used in this repo.

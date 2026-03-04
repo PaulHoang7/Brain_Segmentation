@@ -52,8 +52,8 @@ sam_train:
   weight_decay: 0.01
   scheduler: cosine
   warmup_ratio: 0.1
-  bbox_jitter_shift: 0.1
-  bbox_jitter_scale: 0.1
+  bbox_jitter_shift: 0.15
+  bbox_jitter_scale: 0.15
   loss: dice_bce                         # dice_bce | dice_focal
 
 # ── Cascade Inference ──────────────────────────────────────────

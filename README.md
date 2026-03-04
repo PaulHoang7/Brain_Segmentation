@@ -73,13 +73,6 @@ This repo includes GitHub templates and a setup script for consistent tracking:
 - Workflow guide:
   - `docs/GITHUB_TRACKING.md`
 
-Optional one-time setup for labels and milestones (requires GitHub CLI):
-
-```bash
-gh auth login
-pwsh ./scripts/11_setup_github_tracking.ps1 -Repo "PaulHoang7/Brain_Segmentation"
-```
-
 ## Project Structure
 
 ```

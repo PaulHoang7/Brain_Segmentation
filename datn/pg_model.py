@@ -3,7 +3,8 @@ Prompt Generator (PG): predict per-slice objectness + bbox from 2.5D context.
 
 Architecture:  ResNet18 (conv1 → 9 channels) + two heads:
   - objectness head: Global Average Pool → FC → 1 logit
-  - bbox head:       Global Average Pool → FC → 4 values (normalised x1,y1,x2,y2)
+  - bbox head:       Global Average Pool → FC → 4 values (cx, cy, w, h) in [0,1]
+                     converted to (x1, y1, x2, y2) guaranteeing x1 ≤ x2, y1 ≤ y2
 """
 from __future__ import annotations
 
@@ -74,6 +75,14 @@ class PromptGenerator(nn.Module):
         feat = x.flatten(1)  # (B, 512)
 
         obj_logit = self.obj_head(feat)          # (B, 1)
-        bbox      = self.bbox_head(feat)         # (B, 4)
+        cxcywh    = self.bbox_head(feat)         # (B, 4) — cx, cy, w, h in [0,1]
+
+        # Convert (cx, cy, w, h) → (x1, y1, x2, y2), clamped to [0,1]
+        cx, cy, w, h = cxcywh.unbind(dim=-1)
+        x1 = (cx - w / 2).clamp(0, 1)
+        y1 = (cy - h / 2).clamp(0, 1)
+        x2 = (cx + w / 2).clamp(0, 1)
+        y2 = (cy + h / 2).clamp(0, 1)
+        bbox = torch.stack([x1, y1, x2, y2], dim=-1)  # (B, 4)
 
         return {"objectness": obj_logit.squeeze(-1), "bbox": bbox}

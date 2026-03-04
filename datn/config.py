@@ -112,3 +112,22 @@ def load_label_map() -> dict:
 def load_hparams() -> dict:
     """Return full hparams dict (from configs/hparams.yaml)."""
     return _hp.copy()
+
+
+def seed_everything(seed: int = SEED) -> None:
+    """Set seed for Python, NumPy, and PyTorch (CPU+CUDA) reproducibility."""
+    import random
+    random.seed(seed)
+
+    import numpy as _np
+    _np.random.seed(seed)
+
+    try:
+        import torch as _torch
+        _torch.manual_seed(seed)
+        if _torch.cuda.is_available():
+            _torch.cuda.manual_seed_all(seed)
+            _torch.backends.cudnn.deterministic = True
+            _torch.backends.cudnn.benchmark = False
+    except ImportError:
+        pass

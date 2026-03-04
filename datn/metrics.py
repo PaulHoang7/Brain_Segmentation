@@ -100,21 +100,26 @@ def pg_detection_metrics(pred_obj: np.ndarray,
 
 
 # ── PG bbox IoU ──────────────────────────────────────────────────
+def _single_iou(pb: np.ndarray, gb: np.ndarray) -> float:
+    """IoU between two [x1, y1, x2, y2] boxes (any coord system)."""
+    ix1 = max(pb[0], gb[0])
+    iy1 = max(pb[1], gb[1])
+    ix2 = min(pb[2], gb[2])
+    iy2 = min(pb[3], gb[3])
+    inter = max(0, ix2 - ix1) * max(0, iy2 - iy1)
+    a1 = max(0, pb[2] - pb[0]) * max(0, pb[3] - pb[1])
+    a2 = max(0, gb[2] - gb[0]) * max(0, gb[3] - gb[1])
+    union = a1 + a2 - inter
+    return inter / (union + 1e-9)
+
+
 def pg_bbox_iou(pred_boxes: np.ndarray,
                 gt_boxes: np.ndarray) -> float:
-    """Mean IoU over tumor slices. boxes: (N, 4) [x1,y1,x2,y2]."""
+    """Mean IoU over paired boxes. boxes: (N, 4) [x1,y1,x2,y2] normalised."""
     assert len(pred_boxes) == len(gt_boxes)
-    ious = []
-    for pb, gb in zip(pred_boxes, gt_boxes):
-        ix1 = max(pb[0], gb[0])
-        iy1 = max(pb[1], gb[1])
-        ix2 = min(pb[2], gb[2])
-        iy2 = min(pb[3], gb[3])
-        inter = max(0, ix2 - ix1) * max(0, iy2 - iy1)
-        a1 = max(0, pb[2] - pb[0]) * max(0, pb[3] - pb[1])
-        a2 = max(0, gb[2] - gb[0]) * max(0, gb[3] - gb[1])
-        union = a1 + a2 - inter
-        ious.append(inter / (union + 1e-9))
+    if len(pred_boxes) == 0:
+        return 0.0
+    ious = [_single_iou(pb, gb) for pb, gb in zip(pred_boxes, gt_boxes)]
     return float(np.mean(ious))
 
 

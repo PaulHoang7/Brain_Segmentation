@@ -1,0 +1,62 @@
+name: Progress update
+description: Weekly or milestone progress tracking for experiments/tasks.
+title: "[PROGRESS] "
+labels:
+  - "type:progress"
+  - "status:in-progress"
+body:
+  - type: input
+    id: period
+    attributes:
+      label: Period
+      description: Week or date range.
+      placeholder: Week 7 (2026-03-02 to 2026-03-08)
+    validations:
+      required: true
+
+  - type: input
+    id: objective
+    attributes:
+      label: Objective
+      placeholder: Stabilize SAM+LoRA WT training
+    validations:
+      required: true
+
+  - type: textarea
+    id: done
+    attributes:
+      label: Completed
+      description: Tasks finished in this period.
+      placeholder: |
+        - Added PG temporal smoothing
+        - Trained WT adapter for 20 epochs
+    validations:
+      required: true
+
+  - type: textarea
+    id: metrics
+    attributes:
+      label: Metrics snapshot
+      description: Include Dice/HD95 or PG metrics if available.
+      placeholder: |
+        WT Dice: 0.86
+        TC Dice: 0.72
+        ET Dice: 0.63
+
+  - type: textarea
+    id: blockers
+    attributes:
+      label: Blockers / risks
+      placeholder: |
+        - GPU OOM with batch_size=8
+        - ET false positives increase on val cases
+
+  - type: textarea
+    id: next
+    attributes:
+      label: Next actions
+      placeholder: |
+        - Run ablation: temporal loss off
+        - Improve PG bbox stability
+    validations:
+      required: true

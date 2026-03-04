@@ -138,3 +138,98 @@ def fig_sam_preprocess_sanity(
 
     fig.tight_layout()
     return fig
+
+
+# ── Dataloader debug figures ──────────────────────────────────────
+def fig_pg_sample(sample: dict, idx: int = 0) -> plt.Figure:
+    """
+    Visualise one PGDataset2p5D sample.
+
+    Shows 9 channels arranged as 3 rows (mods) × 3 cols (z-1, z, z+1),
+    plus objectness/bbox annotation.
+    """
+    img = sample["image"]  # (9, H, W) tensor
+    if hasattr(img, "numpy"):
+        img = img.numpy()
+    obj = float(sample["objectness"])
+    bbox = sample["bbox"]
+    if hasattr(bbox, "numpy"):
+        bbox = bbox.numpy()
+    cid = sample.get("case_id", "?")
+    z = sample.get("z", "?")
+
+    fig, axes = plt.subplots(3, 3, figsize=(12, 12))
+    fig.suptitle(f"PG sample #{idx}  {cid} z={z}  obj={obj:.0f}  "
+                 f"bbox=[{bbox[0]:.2f},{bbox[1]:.2f},{bbox[2]:.2f},{bbox[3]:.2f}]",
+                 fontsize=12)
+
+    mod_names = ["t2f", "t1c", "t2w"]
+    slice_names = ["z-1", "z", "z+1"]
+    ch = 0
+    for row in range(3):
+        for col in range(3):
+            ax = axes[row, col]
+            ax.imshow(img[ch], cmap="gray")
+            ax.set_title(f"{mod_names[row]} ({slice_names[col]})", fontsize=9)
+            # Draw bbox on centre slice (col=1)
+            if col == 1 and obj > 0.5:
+                H, W = img[ch].shape
+                x1, y1 = bbox[0] * W, bbox[1] * H
+                x2, y2 = bbox[2] * W, bbox[3] * H
+                rect = patches.Rectangle(
+                    (x1, y1), x2 - x1, y2 - y1,
+                    linewidth=2, edgecolor="lime", facecolor="none")
+                ax.add_patch(rect)
+            ax.axis("off")
+            ch += 1
+
+    fig.tight_layout()
+    return fig
+
+
+def fig_sam_sample(sample: dict, idx: int = 0) -> plt.Figure:
+    """
+    Visualise one SAMDataset sample.
+
+    Col 1: SAM image (1024×1024, 3-ch composite)
+    Col 2: same + bbox prompt overlay
+    Col 3: target mask (256×256)
+    """
+    img = sample["image"]    # (3, 1024, 1024)
+    mask = sample["mask"]    # (1, 256, 256)
+    bbox = sample["bbox"]    # (4,)
+    if hasattr(img, "numpy"):
+        img = img.numpy()
+    if hasattr(mask, "numpy"):
+        mask = mask.numpy()
+    if hasattr(bbox, "numpy"):
+        bbox = bbox.numpy()
+    cid = sample.get("case_id", "?")
+    z = sample.get("z", "?")
+
+    # (3,H,W) → (H,W,3)
+    disp = norm_for_display(img.transpose(1, 2, 0))
+
+    fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+    fig.suptitle(f"SAM sample #{idx}  {cid} z={z}  "
+                 f"bbox=[{bbox[0]:.0f},{bbox[1]:.0f},{bbox[2]:.0f},{bbox[3]:.0f}]",
+                 fontsize=12)
+
+    axes[0].imshow(disp)
+    axes[0].set_title("SAM image (1024)")
+
+    axes[1].imshow(disp)
+    x1, y1, x2, y2 = bbox
+    rect = patches.Rectangle(
+        (x1, y1), x2 - x1, y2 - y1,
+        linewidth=2, edgecolor="lime", facecolor="none")
+    axes[1].add_patch(rect)
+    axes[1].set_title("+ bbox prompt")
+
+    axes[2].imshow(mask[0], cmap="gray", vmin=0, vmax=1)
+    axes[2].set_title(f"Target mask (256)  area={mask.sum():.0f}px")
+
+    for ax in axes:
+        ax.axis("off")
+    fig.tight_layout()
+    return fig

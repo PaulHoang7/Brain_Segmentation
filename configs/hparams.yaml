@@ -46,14 +46,14 @@ lora:
 
 # ── SAM+LoRA Training ──────────────────────────────────────────
 sam_train:
-  epochs: 30
-  batch_size: 4
+  epochs: 15
+  batch_size: 12
   lr: 1.0e-4
   weight_decay: 0.01
   scheduler: cosine
   warmup_ratio: 0.1
-  bbox_jitter_shift: 0.1
-  bbox_jitter_scale: 0.1
+  bbox_jitter_shift: 0.15
+  bbox_jitter_scale: 0.15
   loss: dice_bce                         # dice_bce | dice_focal
 
 # ── Cascade Inference ──────────────────────────────────────────

@@ -55,38 +55,42 @@ def sam_forward(sam, image, bbox, device):
     image: (B, 3, 1024, 1024)
     bbox:  (B, 4) in 1024 space
     Returns: mask logits (B, 1, 256, 256)
+
+    SAM's mask_decoder expects single-image input (repeat_interleave issue),
+    so we batch the encoder but loop over samples for prompt_encoder + decoder.
     """
     with torch.no_grad():
-        image_embeddings = sam.image_encoder(image)
+        image_embeddings = sam.image_encoder(image)  # (B, 256, 64, 64)
 
-    # Prepare sparse (bbox) + dense (none) prompts
     B = image.shape[0]
-    # SAM expects bbox as (B, 4) -> needs to be point format for prompt encoder
-    # bbox prompt: 2 points (top-left, bottom-right) with labels [2, 3]
-    boxes = bbox.reshape(B, 1, 4)  # (B, 1, 4)
-    # Convert to point pairs: (B, 2, 2) with (B, 2) labels
-    box_coords = torch.zeros(B, 2, 2, device=device)
-    box_coords[:, 0, 0] = boxes[:, 0, 0]  # x1
-    box_coords[:, 0, 1] = boxes[:, 0, 1]  # y1
-    box_coords[:, 1, 0] = boxes[:, 0, 2]  # x2
-    box_coords[:, 1, 1] = boxes[:, 0, 3]  # y2
-    box_labels = torch.tensor([[2, 3]], device=device).expand(B, -1)  # box prompt labels
+    image_pe = sam.prompt_encoder.get_dense_pe()  # (1, 256, 64, 64)
 
-    sparse_embeddings, dense_embeddings = sam.prompt_encoder(
-        points=(box_coords, box_labels),
-        boxes=None,
-        masks=None,
-    )
+    all_masks = []
+    for i in range(B):
+        # Per-sample bbox → point prompt
+        box_coords_i = torch.zeros(1, 2, 2, device=device)
+        box_coords_i[0, 0, 0] = bbox[i, 0]  # x1
+        box_coords_i[0, 0, 1] = bbox[i, 1]  # y1
+        box_coords_i[0, 1, 0] = bbox[i, 2]  # x2
+        box_coords_i[0, 1, 1] = bbox[i, 3]  # y2
+        box_labels_i = torch.tensor([[2, 3]], device=device)
 
-    low_res_masks, iou_predictions = sam.mask_decoder(
-        image_embeddings=image_embeddings,
-        image_pe=sam.prompt_encoder.get_dense_pe(),
-        sparse_prompt_embeddings=sparse_embeddings,
-        dense_prompt_embeddings=dense_embeddings,
-        multimask_output=False,
-    )
+        sparse_i, dense_i = sam.prompt_encoder(
+            points=(box_coords_i, box_labels_i),
+            boxes=None,
+            masks=None,
+        )
 
-    return low_res_masks  # (B, 1, 256, 256)
+        low_res_mask_i, _ = sam.mask_decoder(
+            image_embeddings=image_embeddings[i : i + 1],
+            image_pe=image_pe,
+            sparse_prompt_embeddings=sparse_i,
+            dense_prompt_embeddings=dense_i,
+            multimask_output=False,
+        )
+        all_masks.append(low_res_mask_i)
+
+    return torch.cat(all_masks, dim=0)  # (B, 1, 256, 256)
 
 
 # ── Train one epoch ──────────────────────────────────────────────
@@ -214,7 +218,11 @@ def main(target: str = "WT", epochs: int = None, batch_size: int = None,
     from segment_anything import sam_model_registry
     sam = sam_model_registry["vit_b"](checkpoint=str(sam_ckpt))
 
-    # ── Inject LoRA ──────────────────────────────────────────────
+    # Freeze ALL SAM parameters first
+    for p in sam.parameters():
+        p.requires_grad = False
+
+    # ── Inject LoRA (only LoRA params become trainable) ───────
     rank = lora_hp.get("rank", 16)
     alpha = lora_hp.get("alpha", 32)
     dropout = lora_hp.get("dropout", 0.05)

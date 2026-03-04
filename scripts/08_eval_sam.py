@@ -39,30 +39,34 @@ from datn.metrics import dice_score, hausdorff_95
 # ── SAM forward with bbox prompt (same as training) ──────────────
 @torch.no_grad()
 def sam_forward(sam, image, bbox, device):
-    image_embeddings = sam.image_encoder(image)
-
+    """SAM forward with per-sample decoder loop (SAM expects single-image input)."""
+    image_embeddings = sam.image_encoder(image)  # (B, 256, 64, 64)
     B = image.shape[0]
-    box_coords = torch.zeros(B, 2, 2, device=device)
-    box_coords[:, 0, 0] = bbox[:, 0]
-    box_coords[:, 0, 1] = bbox[:, 1]
-    box_coords[:, 1, 0] = bbox[:, 2]
-    box_coords[:, 1, 1] = bbox[:, 3]
-    box_labels = torch.tensor([[2, 3]], device=device).expand(B, -1)
+    image_pe = sam.prompt_encoder.get_dense_pe()
 
-    sparse_embeddings, dense_embeddings = sam.prompt_encoder(
-        points=(box_coords, box_labels),
-        boxes=None,
-        masks=None,
-    )
+    all_masks = []
+    for i in range(B):
+        box_coords_i = torch.zeros(1, 2, 2, device=device)
+        box_coords_i[0, 0, 0] = bbox[i, 0]
+        box_coords_i[0, 0, 1] = bbox[i, 1]
+        box_coords_i[0, 1, 0] = bbox[i, 2]
+        box_coords_i[0, 1, 1] = bbox[i, 3]
+        box_labels_i = torch.tensor([[2, 3]], device=device)
 
-    low_res_masks, iou_predictions = sam.mask_decoder(
-        image_embeddings=image_embeddings,
-        image_pe=sam.prompt_encoder.get_dense_pe(),
-        sparse_prompt_embeddings=sparse_embeddings,
-        dense_prompt_embeddings=dense_embeddings,
-        multimask_output=False,
-    )
-    return low_res_masks  # (B, 1, 256, 256)
+        sparse_i, dense_i = sam.prompt_encoder(
+            points=(box_coords_i, box_labels_i),
+            boxes=None, masks=None,
+        )
+        mask_i, _ = sam.mask_decoder(
+            image_embeddings=image_embeddings[i:i+1],
+            image_pe=image_pe,
+            sparse_prompt_embeddings=sparse_i,
+            dense_prompt_embeddings=dense_i,
+            multimask_output=False,
+        )
+        all_masks.append(mask_i)
+
+    return torch.cat(all_masks, dim=0)  # (B, 1, 256, 256)
 
 
 # ── Main ─────────────────────────────────────────────────────────
@@ -90,6 +94,9 @@ def main(target: str = "WT", split: str = "val",
 
     from segment_anything import sam_model_registry
     sam = sam_model_registry["vit_b"](checkpoint=str(sam_ckpt))
+
+    for p in sam.parameters():
+        p.requires_grad = False
 
     rank = lora_hp.get("rank", 16)
     alpha = lora_hp.get("alpha", 32)

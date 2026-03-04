@@ -1,0 +1,81 @@
+name: Bug report
+description: Report a bug found during preprocessing, training, or inference.
+title: "[BUG] "
+labels:
+  - "type:bug"
+  - "status:triage"
+body:
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: Short description of the bug.
+      placeholder: Training crashes at epoch 3 when loading case BraTS-GLI-00001.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - preprocessing
+        - pg-training
+        - pg-evaluation
+        - sam-lora-training
+        - inference
+        - evaluation
+        - infrastructure
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduce steps
+      description: Provide exact command(s), config, and seed.
+      placeholder: |
+        1. python scripts/05_train_pg.py --seed 42
+        2. ...
+        3. crash at ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / traceback
+      description: Paste relevant logs and stack traces.
+      render: shell
+
+  - type: input
+    id: commit
+    attributes:
+      label: Commit hash
+      placeholder: 4717606
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - critical
+        - high
+        - medium
+        - low
+    validations:
+      required: true
